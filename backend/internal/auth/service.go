@@ -306,6 +306,8 @@ func (s *Service) SetupTOTP(ctx context.Context, user *models.User) (*models.Two
 
 // EnableTOTP mengaktifkan 2FA setelah user memverifikasi kode pertama
 func (s *Service) EnableTOTP(ctx context.Context, user *models.User, code string) ([]string, error) {
+	fmt.Printf("[DEBUG] EnableTOTP called for user %s, TOTPEnabled=%v, TOTPSecret=%v\n", user.ID, user.TOTPEnabled, user.TOTPSecret)
+
 	if user.TOTPEnabled {
 		return nil, ErrTOTPAlreadyEnabled
 	}
@@ -316,6 +318,7 @@ func (s *Service) EnableTOTP(ctx context.Context, user *models.User, code string
 	// Verifikasi kode
 	valid, err := s.verifyTOTPCode(ctx, user, code)
 	if err != nil {
+		fmt.Printf("[DEBUG] verifyTOTPCode error: %v\n", err)
 		return nil, err
 	}
 	if !valid {
@@ -327,12 +330,15 @@ func (s *Service) EnableTOTP(ctx context.Context, user *models.User, code string
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("[DEBUG] Generated %d backup codes, hashedCodes=%v\n", len(backupCodes), hashedCodes)
 
 	// Simpan ke DB
 	if err := s.userRepo.UpdateBackupCodes(ctx, user.ID, hashedCodes); err != nil {
+		fmt.Printf("[DEBUG] UpdateBackupCodes error: %v\n", err)
 		return nil, err
 	}
 	if err := s.userRepo.EnableTOTP(ctx, user.ID); err != nil {
+		fmt.Printf("[DEBUG] EnableTOTP error: %v\n", err)
 		return nil, err
 	}
 
@@ -510,6 +516,7 @@ func (s *Service) createFullSession(ctx context.Context, user *models.User, req 
 }
 
 func (s *Service) verifyTOTPCode(ctx context.Context, user *models.User, code string) (bool, error) {
+	fmt.Printf("[DEBUG] verifyTOTPCode called, TOTPSecret=%v\n", user.TOTPSecret)
 	if user.TOTPSecret == nil {
 		return false, errors.New("TOTP not configured")
 	}
@@ -517,8 +524,10 @@ func (s *Service) verifyTOTPCode(ctx context.Context, user *models.User, code st
 	// Decrypt secret
 	secret, err := s.decryptTOTPSecret(*user.TOTPSecret)
 	if err != nil {
+		fmt.Printf("[DEBUG] decryptTOTPSecret error: %v\n", err)
 		return false, fmt.Errorf("failed to decrypt TOTP secret: %w", err)
 	}
+	fmt.Printf("[DEBUG] Decrypted secret: %s\n", secret)
 
 	// Cek apakah ini backup code (8 karakter alphanumeric)
 	if len(code) == 8 {
@@ -532,6 +541,7 @@ func (s *Service) verifyTOTPCode(ctx context.Context, user *models.User, code st
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA1,
 	})
+	fmt.Printf("[DEBUG] TOTP validation result: valid=%v, err=%v\n", valid, err)
 	return valid, err
 }
 

@@ -133,8 +133,15 @@ func (r *PostgresUserRepository) UpdateBackupCodes(ctx context.Context, userID u
 		return fmt.Errorf("failed to marshal backup codes: %w", err)
 	}
 
+	// Debug: log what we're trying to insert
+	fmt.Printf("[DEBUG] UpdateBackupCodes: jsonCodes = %s, len=%d\n", string(jsonCodes), len(jsonCodes))
+
+	// Send as string - PostgreSQL will interpret it as JSON
 	query := `UPDATE users SET backup_codes = $1 WHERE id = $2`
-	_, err = r.db.Pool.Exec(ctx, query, jsonCodes, userID)
+	_, err = r.db.Pool.Exec(ctx, query, string(jsonCodes), userID)
+	if err != nil {
+		fmt.Printf("[DEBUG] UpdateBackupCodes ERROR: %v\n", err)
+	}
 	return err
 }
 
