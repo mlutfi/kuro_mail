@@ -1,10 +1,13 @@
 <div align="center">
   <img src="./logo.png" alt="KuroMail Logo" width="200"/>
-  <h1>KuroMail</h1>
   <p>Web Email Client connected to Stalwart Mail Server.</p>
 </div>
 
 ---
+
+## Screenshots
+
+![KuroMail Screenshot](./kuromail_web.png)
 
 ## 📌 Features
 
