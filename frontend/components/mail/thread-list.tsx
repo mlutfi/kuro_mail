@@ -20,6 +20,7 @@ import {
     FileText,
     Star,
     AlertTriangle,
+    ShieldCheck,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -139,6 +140,26 @@ export default function ThreadList({ folder }: ThreadListProps) {
         setSelectedThreads(new Set());
     };
 
+    const handleBulkReportSpam = async () => {
+        if (selectedThreads.size === 0) return;
+        const uids = threads
+            .filter((t) => selectedThreads.has(t.thread_id))
+            .flatMap((t) => t.message_uids || []);
+        if (uids.length > 0) await moveMessages(uids, "Junk");
+        toast.success("Reported as spam");
+        setSelectedThreads(new Set());
+    };
+
+    const handleBulkNotSpam = async () => {
+        if (selectedThreads.size === 0) return;
+        const uids = threads
+            .filter((t) => selectedThreads.has(t.thread_id))
+            .flatMap((t) => t.message_uids || []);
+        if (uids.length > 0) await moveMessages(uids, "INBOX");
+        toast.success("Marked as not spam");
+        setSelectedThreads(new Set());
+    };
+
     const handleBulkMoveToInbox = async () => {
         if (selectedThreads.size === 0) return;
         const uids = threads
@@ -212,6 +233,30 @@ export default function ThreadList({ folder }: ThreadListProps) {
                             >
                                 <Archive className="w-4 h-4 mr-1" />
                                 <span className="hidden sm:inline">Archive</span>
+                            </Button>
+                        )}
+
+                        {folder.toUpperCase() !== "JUNK" && folder.toUpperCase() !== "TRASH" && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-gray-600 rounded-[7px] text-[13px]"
+                                onClick={handleBulkReportSpam}
+                            >
+                                <AlertTriangle className="w-4 h-4 mr-1" />
+                                <span className="hidden sm:inline">Spam</span>
+                            </Button>
+                        )}
+
+                        {folder.toUpperCase() === "JUNK" && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-gray-600 rounded-[7px] text-[13px]"
+                                onClick={handleBulkNotSpam}
+                            >
+                                <ShieldCheck className="w-4 h-4 mr-1" />
+                                <span className="hidden sm:inline">Not Spam</span>
                             </Button>
                         )}
 

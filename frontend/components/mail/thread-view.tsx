@@ -15,6 +15,8 @@ import {
     Trash2,
     Star,
     Inbox,
+    AlertTriangle,
+    ShieldCheck,
 } from "lucide-react";
 import { EmailMessage, EmailAddress } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -143,6 +145,28 @@ export default function ThreadView({ threadId, folder = "INBOX", onUnreadUpdate 
             uids: getAllUIDs(),
         });
         toast.success("Archived");
+        router.push(`/mail/${folder.toLowerCase()}`);
+    };
+
+    const handleReportSpam = async () => {
+        if (!thread) return;
+        await apiPost("/email/messages/move", {
+            src_folder: folder,
+            dst_folder: "Junk",
+            uids: getAllUIDs(),
+        });
+        toast.success("Reported as spam");
+        router.push(`/mail/${folder.toLowerCase()}`);
+    };
+
+    const handleNotSpam = async () => {
+        if (!thread) return;
+        await apiPost("/email/messages/move", {
+            src_folder: folder,
+            dst_folder: "INBOX",
+            uids: getAllUIDs(),
+        });
+        toast.success("Marked as not spam");
         router.push(`/mail/${folder.toLowerCase()}`);
     };
 
@@ -296,6 +320,26 @@ export default function ThreadView({ threadId, folder = "INBOX", onUnreadUpdate 
                             onClick={handleArchive}
                         >
                             <Archive className="w-4 h-4" />
+                        </Button>
+                    )}
+                    {folder.toUpperCase() !== "JUNK" && folder.toUpperCase() !== "TRASH" && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-[7px]"
+                            onClick={handleReportSpam}
+                        >
+                            <AlertTriangle className="w-4 h-4" />
+                        </Button>
+                    )}
+                    {folder.toUpperCase() === "JUNK" && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-[7px]"
+                            onClick={handleNotSpam}
+                        >
+                            <ShieldCheck className="w-4 h-4" />
                         </Button>
                     )}
                     <Button

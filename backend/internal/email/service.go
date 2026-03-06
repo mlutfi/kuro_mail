@@ -96,9 +96,47 @@ func (s *Service) ListThreads(ctx context.Context, user *models.User, folder str
 	if fetchCount > 1500 {
 		fetchCount = 1500
 	}
-	messages, totalMessages, err := conn.FetchMessageList(folder, 1, fetchCount)
-	if err != nil {
-		return nil, fmt.Errorf("fetch messages: %w", err)
+
+	var messages []*models.EmailMessage
+	var totalMessages int
+
+	if strings.EqualFold(folder, "Starred") {
+		// Search for flagged messages in INBOX
+		uids, err := conn.SearchMessages("INBOX", &imap.SearchCriteria{
+			Flag: []imap.Flag{imap.FlagFlagged},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("search starred: %w", err)
+		}
+
+		totalMessages = len(uids)
+
+		// Reverse to get newest first
+		for i, j := 0, len(uids)-1; i < j; i, j = i+1, j-1 {
+			uids[i], uids[j] = uids[j], uids[i]
+		}
+
+		start := (page - 1) * fetchCount
+		end := start + fetchCount
+		if start >= len(uids) {
+			uids = []uint32{}
+		} else {
+			if end > len(uids) {
+				end = len(uids)
+			}
+			uids = uids[start:end]
+		}
+
+		messages, err = conn.FetchMessageListByUIDs("INBOX", uids)
+		if err != nil {
+			return nil, fmt.Errorf("fetch starred messages: %w", err)
+		}
+	} else {
+		var err error
+		messages, totalMessages, err = conn.FetchMessageList(folder, 1, fetchCount)
+		if err != nil {
+			return nil, fmt.Errorf("fetch messages: %w", err)
+		}
 	}
 
 	threads := s.threadEngine.BuildThreads(messages)
@@ -522,10 +560,16 @@ func (s *Service) MarkStarred(ctx context.Context, user *models.User, folder str
 	}
 	defer s.imapPool.ReturnConn(conn)
 
-	if err := conn.MarkStarred(folder, uids, starred); err != nil {
+	targetFolder := folder
+	if strings.EqualFold(folder, "Starred") {
+		targetFolder = "INBOX"
+	}
+
+	if err := conn.MarkStarred(targetFolder, uids, starred); err != nil {
 		return err
 	}
 	_ = s.cache.InvalidateInboxCache(ctx, user.ID.String(), folder)
+	_ = s.cache.InvalidateInboxCache(ctx, user.ID.String(), "Starred")
 	return nil
 }
 

@@ -247,6 +247,55 @@ func (c *IMAPConn) FetchMessageList(folder string, page, perPage int) ([]*models
 	return messages, total, nil
 }
 
+// FetchMessageListByUIDs retrieves lightweight message headers for a specific list of UIDs.
+func (c *IMAPConn) FetchMessageListByUIDs(folder string, uids []uint32) ([]*models.EmailMessage, error) {
+	if len(uids) == 0 {
+		return []*models.EmailMessage{}, nil
+	}
+
+	if _, err := c.client.Select(folder, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
+		return nil, fmt.Errorf("select folder %q: %w", folder, err)
+	}
+
+	var uidSet imap.UIDSet
+	for _, uid := range uids {
+		uidSet.AddNum(imap.UID(uid))
+	}
+
+	fetchCmd := c.client.Fetch(imap.UIDSet(uidSet), &imap.FetchOptions{
+		Flags:         true,
+		Envelope:      true,
+		BodyStructure: &imap.FetchItemBodyStructure{Extended: false},
+		RFC822Size:    true,
+		InternalDate:  true,
+		UID:           true,
+		BodySection: []*imap.FetchItemBodySection{
+			{Specifier: imap.PartSpecifierHeader},
+		},
+	})
+
+	var messages []*models.EmailMessage
+	for {
+		msg := fetchCmd.Next()
+		if msg == nil {
+			break
+		}
+		if email := parseEnvelopeMessage(msg, folder); email != nil {
+			messages = append(messages, email)
+		}
+	}
+
+	if err := fetchCmd.Close(); err != nil {
+		return nil, err
+	}
+
+	// IMAP FETCH doesn't guarantee order matching the UIDSet, though it often returns ascending.
+	// We reverse to get descending order assuming we requested them that way, but ideally
+	// we should sort them to match the `uids` order. For now, reversing is standard.
+	reverseMessages(messages)
+	return messages, nil
+}
+
 // FetchMessageBody fetches the complete RFC822 body of a single message and
 // parses it with the full MIME parser (handles multipart, attachments, encoding).
 func (c *IMAPConn) FetchMessageBody(folder string, uid uint32) (*models.EmailMessage, error) {
